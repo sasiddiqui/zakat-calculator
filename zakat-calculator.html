@@ -1,0 +1,484 @@
+<!--
+TODO:
+   - currencies 
+   - madhhabs
+   - FAQ 
+   
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zakat Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Remove up/down arrows from number inputs */
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+        
+        /* Result message animations */
+        .result-appear {
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-4">
+    <div class="container mx-auto flex flex-col lg:flex-row gap-4 items-start justify-center">
+        <div class="bg-white shadow-lg rounded-2xl p-6 w-full max-w-md">
+            <h1 class="text-2xl font-bold text-center mb-4">Zakat Calculator</h1>
+
+            <form id="zakat-form" class="space-y-6">
+                <div>
+                    <label class="font-semibold flex items-center">Use Nisab Based on:</label>
+                    <select id="nisab-type" class="w-full p-2 border rounded">
+                        <option value="gold">Gold</option>
+                        <option value="silver">Silver</option>
+                    </select>
+                </div>
+
+                <button type="button" onclick="calculateZakat()" class="w-full bg-blue-500 text-white p-2 rounded font-semibold hover:bg-blue-600">Calculate</button>
+            </form>
+
+            <div id="result" class="mt-4 text-center text-lg font-semibold"></div>
+            <a href="#" class="block text-center text-blue-600 mt-2 hover:underline" id="pay-link" style="display: none;">Pay Zakat Now</a>
+        </div>
+
+        <div class="bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg rounded-2xl p-6 w-full max-w-md">
+            <h3 class="text-xl font-bold mb-4 text-gray-800 text-center">Current Market Values</h3>
+            <div class="grid grid-cols-2 gap-8">
+                <div class="bg-white rounded-xl p-4 shadow-sm">
+                    <div class="flex items-center justify-center mb-2">
+                        <svg class="w-6 h-6 text-yellow-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clip-rule="evenodd"/>
+                        </svg>
+                        <h4 class="text-lg font-semibold text-gray-800">Gold</h4>
+                    </div>
+                    <div class="space-y-1 text-center">
+                        <p class="text-gray-600">Price: <span class="font-semibold text-gray-800">$<span id="live-gold-price">0.00</span>/gram</span></p>
+                        <p class="text-gray-600">Nisab: <span class="font-semibold text-gray-800">$<span id="gold-nisab-value">0.00</span></span></p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl p-4 shadow-sm">
+                    <div class="flex items-center justify-center mb-2">
+                        <svg class="w-6 h-6 text-gray-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clip-rule="evenodd"/>
+                        </svg>
+                        <h4 class="text-lg font-semibold text-gray-800">Silver</h4>
+                    </div>
+                    <div class="space-y-1 text-center">
+                        <p class="text-gray-600">Price: <span class="font-semibold text-gray-800">$<span id="live-silver-price">0.00</span>/gram</span></p>
+                        <p class="text-gray-600">Nisab: <span class="font-semibold text-gray-800">$<span id="silver-nisab-value">0.00</span></span></p>
+                    </div>
+                </div>
+            </div>
+            <div class="text-center mt-4">
+                <p class="text-sm text-gray-500">Prices update every 5 minutes</p>
+                <p class="text-xs text-gray-400 mt-1">Last updated: <span id="last-update-time"></span></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Constants
+        const CONSTANTS = {
+            GOLD_NISAB_GRAMS: 87.48,
+            SILVER_NISAB_GRAMS: 612.36,
+            TROY_OUNCE_TO_GRAM: 31.1034768,
+            ZAKAT_RATE: 0.025
+        };
+
+        // Form configuration
+        const formConfig = {
+            sections: {
+                personalAssets: {
+                    id: 'personal-assets',
+                    title: 'Personal Assets',
+                    defaultChecked: true,
+                    fields: {
+                        cash: {
+                            label: 'Cash & Bank Balances',
+                            tooltip: 'Include cash on hand and all bank account balances',
+                            groupId: 'cash-group'
+                        },
+                        preciousMetals: {
+                            label: 'Gold & Silver',
+                            tooltip: 'Total weight of all gold and silver, including jewelry and coins. Current market prices are used to calculate value.',
+                            groupId: 'precious-metals-group',
+                            type: 'precious-metals'
+                        },
+                        investments: {
+                            label: 'Investments',
+                            tooltip: 'Total market value of stocks, shares, bonds, mutual funds, cryptocurrencies, and other investments, if purchased with the intention of resale.',
+                            groupId: 'investments-group'
+                        },
+                        retirement: {
+                            label: 'Retirement Accounts',
+                            tooltip: 'Cash value of retirement accounts (IRA, 401k, etc.)',
+                            groupId: 'retirement-group'
+                        },
+                        receivables: {
+                            label: 'Receivables',
+                            tooltip: 'Loans given to others, expected tax refunds, etc.',
+                            groupId: 'receivables-group'
+                        }
+                    }
+                },
+                personalLiabilities: {
+                    id: 'personal-liabilities',
+                    title: 'Personal Liabilities',
+                    defaultChecked: true,
+                    fields: {
+                        personalDebts: {
+                            label: 'Personal Debts',
+                            tooltip: 'Personal loans owed, credit card debt, etc.',
+                            groupId: 'personal-debts-group'
+                        },
+                        immediateDebts: {
+                            label: 'Immediate Debts',
+                            tooltip: 'Immediate debts due (rent, utilities, etc.)',
+                            groupId: 'immediate-debts-group'
+                        },
+                        zakatPaid: {
+                            label: 'Zakat Paid in Advance',
+                            tooltip: 'Any Zakat amount already paid in advance',
+                            groupId: 'zakat-paid-group'
+                        }
+                    }
+                },
+                businessAssets: {
+                    id: 'business-assets',
+                    title: 'Business Assets',
+                    defaultChecked: false,
+                    fields: {
+                        businessCash: {
+                            label: 'Business Cash & Bank Balances',
+                            tooltip: 'Business cash on hand and bank balances',
+                            groupId: 'business-cash-group'
+                        },
+                        inventory: {
+                            label: 'Inventory Value',
+                            tooltip: 'Net value of business inventory & trade goods',
+                            groupId: 'inventory-group'
+                        },
+                        businessReceivables: {
+                            label: 'Business Receivables',
+                            tooltip: 'Expected business receivables by Zakat due date',
+                            groupId: 'business-receivables-group'
+                        }
+                    }
+                },
+                businessLiabilities: {
+                    id: 'business-liabilities',
+                    title: 'Business Liabilities',
+                    defaultChecked: false,
+                    fields: {
+                        businessLoans: {
+                            label: 'Business Loans',
+                            tooltip: 'Outstanding business loans and credit',
+                            groupId: 'business-loans-group'
+                        },
+                        accountsPayable: {
+                            label: 'Accounts Payable',
+                            tooltip: 'Money owed to suppliers and vendors',
+                            groupId: 'accounts-payable-group'
+                        },
+                        wagesPayable: {
+                            label: 'Wages & Salaries Payable',
+                            tooltip: 'Outstanding wages, salaries, and benefits owed to employees',
+                            groupId: 'wages-payable-group'
+                        },
+                        businessTaxes: {
+                            label: 'Business Taxes Due',
+                            tooltip: 'Pending business tax payments',
+                            groupId: 'business-taxes-group'
+                        }
+                    }
+                }
+            }
+        };
+
+        // State management
+        let state = {
+            goldPrice: 0,
+            silverPrice: 0
+        };
+
+        // UI Components
+        const UI = {
+            createInputField(groupId, placeholder = "Enter amount") {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'flex items-center gap-2 mt-2';
+                
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.className = 'w-full p-2 border rounded';
+                input.placeholder = placeholder;
+                input.dataset.group = groupId;
+                
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'text-red-500 hover:text-red-700';
+                removeBtn.innerHTML = '&times;';
+                removeBtn.onclick = () => wrapper.remove();
+                
+                wrapper.append(input, removeBtn);
+                return wrapper;
+            },
+
+            createLabelWithTooltip(label, tooltip) {
+                return `
+                    <label class="font-semibold flex items-center">
+                        ${label}
+                        <div class="relative inline-block ml-2 group">
+                            <span class="text-gray-400 group-hover:text-black cursor-pointer">&#9432;</span>
+                            <div class="absolute left-0 top-6 bg-gray-800 text-white text-xs rounded p-2 w-48 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                ${tooltip}
+                            </div>
+                        </div>
+                    </label>
+                `;
+            },
+
+            createPreciousMetalsFields() {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'flex items-center gap-2';
+                
+                const goldInput = document.createElement('input');
+                goldInput.type = 'number';
+                goldInput.className = 'w-1/2 p-2 border rounded';
+                goldInput.placeholder = 'Gold (grams)';
+                goldInput.dataset.group = 'gold-weight';
+                
+                const silverInput = document.createElement('input');
+                silverInput.type = 'number';
+                silverInput.className = 'w-1/2 p-2 border rounded';
+                silverInput.placeholder = 'Silver (grams)';
+                silverInput.dataset.group = 'silver-weight';
+                
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'text-red-500 hover:text-red-700';
+                removeBtn.innerHTML = '&times;';
+                removeBtn.onclick = () => wrapper.remove();
+                
+                wrapper.append(goldInput, silverInput, removeBtn);
+                return wrapper;
+            },
+
+            createSection(sectionId, sectionConfig) {
+                const section = document.createElement('div');
+                section.className = 'border rounded-lg p-4';
+                
+                const header = document.createElement('div');
+                header.className = 'flex items-center justify-between mb-4';
+                
+                const title = document.createElement('h2');
+                title.className = 'text-lg font-semibold';
+                title.textContent = sectionConfig.title;
+                
+                const toggleWrapper = document.createElement('label');
+                toggleWrapper.className = 'relative inline-flex items-center cursor-pointer';
+                
+                const toggle = document.createElement('input');
+                toggle.type = 'checkbox';
+                toggle.className = 'sr-only peer';
+                toggle.checked = sectionConfig.defaultChecked;
+                
+                const toggleUI = document.createElement('div');
+                toggleUI.className = 'w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[\'\'] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600';
+                
+                const content = document.createElement('div');
+                content.id = `${sectionId}-section`;
+                content.className = 'space-y-4' + (!sectionConfig.defaultChecked ? ' hidden' : '');
+                
+                toggleWrapper.append(toggle, toggleUI);
+                header.append(title, toggleWrapper);
+                section.append(header, content);
+                
+                toggle.addEventListener('change', () => content.classList.toggle('hidden', !toggle.checked));
+                
+                return { section, content };
+            }
+        };
+
+        // Calculation helpers
+        const Calculator = {
+            getGroupTotal(groupId) {
+                return Array.from(document.querySelectorAll(`[data-group="${groupId}"]`))
+                    .reduce((sum, input) => sum + (Number(input.value) || 0), 0);
+            },
+
+            calculateTotalAssets() {
+                const goldWeights = this.getGroupTotal('gold-weight');
+                const silverWeights = this.getGroupTotal('silver-weight');
+                const goldValue = goldWeights * state.goldPrice;
+                const silverValue = silverWeights * state.silverPrice;
+
+                const otherAssets = Object.entries(formConfig.sections)
+                    .filter(([key]) => key.includes('Assets'))
+                    .reduce((total, [_, section]) => {
+                        return total + Object.values(section.fields)
+                            .filter(field => field.type !== 'precious-metals')
+                            .reduce((sectionTotal, field) => sectionTotal + this.getGroupTotal(field.groupId), 0);
+                    }, 0);
+
+                return goldValue + silverValue + otherAssets;
+            },
+
+            calculateTotalLiabilities() {
+                const personalLiabilities = Object.values(formConfig.sections.personalLiabilities.fields)
+                    .reduce((total, field) => total + this.getGroupTotal(field.groupId), 0);
+                
+                const businessLiabilities = Object.values(formConfig.sections.businessLiabilities.fields)
+                    .reduce((total, field) => total + this.getGroupTotal(field.groupId), 0);
+                
+                return personalLiabilities + businessLiabilities;
+            }
+        };
+
+        // Price management
+        async function updateMetalPrices() {
+            try {
+                // Simulated prices for demo
+                state.goldPrice = 2881.20 / CONSTANTS.TROY_OUNCE_TO_GRAM;
+                state.silverPrice = 33.50 / CONSTANTS.TROY_OUNCE_TO_GRAM;
+                
+                document.getElementById('live-gold-price').textContent = state.goldPrice.toFixed(2);
+                document.getElementById('live-silver-price').textContent = state.silverPrice.toFixed(2);
+                document.getElementById('gold-nisab-value').textContent = (CONSTANTS.GOLD_NISAB_GRAMS * state.goldPrice).toFixed(2);
+                document.getElementById('silver-nisab-value').textContent = (CONSTANTS.SILVER_NISAB_GRAMS * state.silverPrice).toFixed(2);
+                document.getElementById('last-update-time').textContent = new Date().toLocaleTimeString();
+            } catch (error) {
+                console.error('Error updating metal prices:', error);
+            }
+        }
+
+        // Main calculation function
+        function calculateZakat() {
+            if (!state.goldPrice || !state.silverPrice) {
+                document.getElementById('result').innerHTML = '<div class="text-red-500">Unable to calculate. Please wait for metal prices to load.</div>';
+                return;
+            }
+
+            const totalAssets = Calculator.calculateTotalAssets();
+            const totalLiabilities = Calculator.calculateTotalLiabilities();
+            const netWealth = totalAssets - totalLiabilities;
+
+            const nisabType = document.getElementById('nisab-type').value;
+            const nisabThreshold = nisabType === 'gold' 
+                ? CONSTANTS.GOLD_NISAB_GRAMS * state.goldPrice 
+                : CONSTANTS.SILVER_NISAB_GRAMS * state.silverPrice;
+
+            const isEligible = netWealth >= nisabThreshold;
+            const zakatAmount = isEligible ? netWealth * CONSTANTS.ZAKAT_RATE : 0;
+
+            document.getElementById('result').innerHTML = `
+                <div class="result-appear space-y-4 bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-xl shadow-sm">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-white p-4 rounded-lg shadow-sm">
+                            <h3 class="text-gray-600 text-sm mb-1">Total Assets</h3>
+                            <p class="text-xl font-semibold text-gray-800">$${totalAssets.toFixed(2)}</p>
+                        </div>
+                        <div class="bg-white p-4 rounded-lg shadow-sm">
+                            <h3 class="text-gray-600 text-sm mb-1">Total Liabilities</h3>
+                            <p class="text-xl font-semibold text-gray-800">$${totalLiabilities.toFixed(2)}</p>
+                        </div>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg shadow-sm">
+                        <h3 class="text-gray-600 text-sm mb-1">Net Wealth</h3>
+                        <p class="text-xl font-semibold text-gray-800">$${netWealth.toFixed(2)}</p>
+                    </div>
+                    ${isEligible ? `
+                        <div class="bg-blue-500 p-4 rounded-lg shadow-sm text-white">
+                            <h3 class="text-sm mb-1 opacity-90">Zakat Amount Due</h3>
+                            <p class="text-2xl font-bold">$${zakatAmount.toFixed(2)}</p>
+                        </div>
+                    ` : `
+                        <div class="bg-gray-100 p-4 rounded-lg shadow-sm">
+                            <p class="text-lg font-semibold text-gray-700">You are not eligible to pay Zakat</p>
+                            <p class="text-sm text-gray-600 mt-1">Your wealth is below the Nisab threshold</p>
+                        </div>
+                    `}
+                </div>
+            `;
+            
+            document.getElementById('pay-link').style.display = isEligible ? 'block' : 'none';
+        }
+
+        // Initialization
+        function initializeForm() {
+            const form = document.getElementById('zakat-form');
+            const nisabSelector = form.querySelector('div:first-child').cloneNode(true);
+            const calculateButton = form.querySelector('button').cloneNode(true);
+            
+            form.innerHTML = '';
+            form.appendChild(nisabSelector);
+            
+            Object.entries(formConfig.sections).forEach(([_, sectionConfig]) => {
+                const { section, content } = UI.createSection(sectionConfig.id, sectionConfig);
+                
+                Object.entries(sectionConfig.fields).forEach(([_, fieldConfig]) => {
+                    if (fieldConfig.type === 'precious-metals') {
+                        const preciousMetalsDiv = document.createElement('div');
+                        preciousMetalsDiv.id = 'precious-metals-group';
+                        preciousMetalsDiv.innerHTML = `
+                            <div class="flex items-center justify-between">
+                                ${UI.createLabelWithTooltip(fieldConfig.label, fieldConfig.tooltip)}
+                                <button type="button" class="text-blue-500 hover:text-blue-700 text-sm">+ Add Another</button>
+                            </div>
+                            <div class="precious-metals-container space-y-2 mt-2"></div>
+                        `;
+                        const addButton = preciousMetalsDiv.querySelector('button');
+                        const container = preciousMetalsDiv.querySelector('.precious-metals-container');
+                        addButton.onclick = () => container.appendChild(UI.createPreciousMetalsFields());
+                        content.appendChild(preciousMetalsDiv);
+                        setTimeout(() => container.appendChild(UI.createPreciousMetalsFields()), 0);
+                    } else {
+                        const fieldDiv = document.createElement('div');
+                        fieldDiv.id = fieldConfig.groupId;
+                        fieldDiv.innerHTML = `
+                            <div class="flex items-center justify-between">
+                                ${UI.createLabelWithTooltip(fieldConfig.label, fieldConfig.tooltip)}
+                                <button type="button" class="text-blue-500 hover:text-blue-700 text-sm">+ Add Another</button>
+                            </div>
+                            <div class="inputs-container space-y-2"></div>
+                        `;
+                        fieldDiv.querySelector('button').onclick = () => fieldDiv.querySelector('.inputs-container').appendChild(UI.createInputField(fieldConfig.groupId));
+                        content.appendChild(fieldDiv);
+                        fieldDiv.querySelector('.inputs-container').appendChild(UI.createInputField(fieldConfig.groupId));
+                    }
+                });
+                
+                form.appendChild(section);
+            });
+            
+            form.appendChild(calculateButton);
+        }
+
+        // Start the application
+        window.onload = function() {
+            initializeForm();
+            updateMetalPrices();
+            setInterval(updateMetalPrices, 300000); // Update every 5 minutes
+        };
+    </script>
+</body>
+</html>
+
+
+
