@@ -41,25 +41,18 @@ TODO:
             <h1 class="text-2xl font-bold text-center mb-4">Zakat Calculator</h1>
 
             <form id="zakat-form" class="space-y-6">
-                <div>
-                    <label class="font-semibold flex items-center">Use Nisab Based on:</label>
-                    <select id="nisab-type" class="w-full p-2 border rounded">
-                        <option value="gold">Gold</option>
-                        <option value="silver">Silver</option>
-                    </select>
-                </div>
-
                 <button type="button" onclick="calculateZakat()" class="w-full bg-blue-500 text-white p-2 rounded font-semibold hover:bg-blue-600">Calculate</button>
             </form>
 
             <div id="result" class="mt-4 text-center text-lg font-semibold"></div>
-            <a href="#" class="block text-center text-blue-600 mt-2 hover:underline" id="pay-link" style="display: none;">Pay Zakat Now</a>
+            <button id="pay-link" style="display: none;" class="w-full mt-4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white p-3 rounded-lg font-semibold hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-md hover:shadow-lg">Pay Zakat Now</button>
         </div>
 
         <div class="bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg rounded-2xl p-6 w-full max-w-md">
-            <h3 class="text-xl font-bold mb-4 text-gray-800 text-center">Current Market Values</h3>
+            <h3 class="text-xl font-bold mb-4 text-gray-800 text-center">Nisab Type</h3>
             <div class="grid grid-cols-2 gap-8">
-                <div class="bg-white rounded-xl p-4 shadow-sm">
+                <div class="bg-white rounded-xl p-4 shadow-sm relative group cursor-pointer nisab-card" onclick="setNisabType('gold')" data-type="gold">
+                    <div class="absolute inset-0 border-2 border-transparent rounded-xl transition-all duration-200"></div>
                     <div class="flex items-center justify-center mb-2">
                         <svg class="w-6 h-6 text-yellow-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
@@ -71,8 +64,12 @@ TODO:
                         <p class="text-gray-600">Price: <span class="font-semibold text-gray-800">$<span id="live-gold-price">0.00</span>/gram</span></p>
                         <p class="text-gray-600">Nisab: <span class="font-semibold text-gray-800">$<span id="gold-nisab-value">0.00</span></span></p>
                     </div>
+                    <div class="absolute top-2 right-2">
+                        <div id="gold-check" class="w-4 h-4 bg-yellow-500 rounded-full"></div>
+                    </div>
                 </div>
-                <div class="bg-white rounded-xl p-4 shadow-sm">
+                <div class="bg-white rounded-xl p-4 shadow-sm relative group cursor-pointer nisab-card" onclick="setNisabType('silver')" data-type="silver">
+                    <div class="absolute inset-0 border-2 border-transparent rounded-xl transition-all duration-200"></div>
                     <div class="flex items-center justify-center mb-2">
                         <svg class="w-6 h-6 text-gray-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
@@ -84,10 +81,14 @@ TODO:
                         <p class="text-gray-600">Price: <span class="font-semibold text-gray-800">$<span id="live-silver-price">0.00</span>/gram</span></p>
                         <p class="text-gray-600">Nisab: <span class="font-semibold text-gray-800">$<span id="silver-nisab-value">0.00</span></span></p>
                     </div>
+                    <div class="absolute top-2 right-2">
+                        <div id="silver-check" class="hidden w-4 h-4 bg-gray-400 rounded-full"></div>
+                    </div>
                 </div>
             </div>
-            <div class="text-center mt-4">
-                <p class="text-sm text-gray-500">Prices update every 5 minutes</p>
+            <p class="text-sm text-gray-500 text-center mt-4">Click to select Nisab calculation method</p>
+            <div class="text-center mt-2">
+                <p class="text-sm text-gray-500">Current market prices update every 5 minutes</p>
                 <p class="text-xs text-gray-400 mt-1">Last updated: <span id="last-update-time"></span></p>
             </div>
         </div>
@@ -232,8 +233,8 @@ TODO:
                 
                 const removeBtn = document.createElement('button');
                 removeBtn.type = 'button';
-                removeBtn.className = 'text-red-500 hover:text-red-700';
-                removeBtn.innerHTML = '&times;';
+                removeBtn.className = 'text-red-500 hover:text-red-700 w-6 h-6 flex items-center justify-center text-xl font-bold leading-none';
+                removeBtn.innerHTML = '−';
                 removeBtn.onclick = () => wrapper.remove();
                 
                 wrapper.append(input, removeBtn);
@@ -272,8 +273,8 @@ TODO:
                 
                 const removeBtn = document.createElement('button');
                 removeBtn.type = 'button';
-                removeBtn.className = 'text-red-500 hover:text-red-700';
-                removeBtn.innerHTML = '&times;';
+                removeBtn.className = 'text-red-500 hover:text-red-700 w-6 h-6 flex items-center justify-center text-xl font-bold leading-none';
+                removeBtn.innerHTML = '−';
                 removeBtn.onclick = () => wrapper.remove();
                 
                 wrapper.append(goldInput, silverInput, removeBtn);
@@ -288,6 +289,8 @@ TODO:
                 header.className = 'flex items-center justify-between mb-4';
                 
                 const title = document.createElement('h2');
+                const isAssetSection = sectionId.includes('assets');
+                const isLiabilitySection = sectionId.includes('liabilities');
                 title.className = 'text-lg font-semibold';
                 title.textContent = sectionConfig.title;
                 
@@ -305,6 +308,12 @@ TODO:
                 const content = document.createElement('div');
                 content.id = `${sectionId}-section`;
                 content.className = 'space-y-4' + (!sectionConfig.defaultChecked ? ' hidden' : '');
+                
+                if (isAssetSection) {
+                    section.className += ' bg-emerald-50/50';
+                } else if (isLiabilitySection) {
+                    section.className += ' bg-rose-50/50';
+                }
                 
                 toggleWrapper.append(toggle, toggleUI);
                 header.append(title, toggleWrapper);
@@ -379,7 +388,7 @@ TODO:
             const totalLiabilities = Calculator.calculateTotalLiabilities();
             const netWealth = totalAssets - totalLiabilities;
 
-            const nisabType = document.getElementById('nisab-type').value;
+            const nisabType = window.selectedNisabType;
             const nisabThreshold = nisabType === 'gold' 
                 ? CONSTANTS.GOLD_NISAB_GRAMS * state.goldPrice 
                 : CONSTANTS.SILVER_NISAB_GRAMS * state.silverPrice;
@@ -410,7 +419,7 @@ TODO:
                         </div>
                     ` : `
                         <div class="bg-gray-100 p-4 rounded-lg shadow-sm">
-                            <p class="text-lg font-semibold text-gray-700">You are not eligible to pay Zakat</p>
+                            <p class="text-lg font-semibold text-gray-700">You do not need to pay Zakat</p>
                             <p class="text-sm text-gray-600 mt-1">Your wealth is below the Nisab threshold</p>
                         </div>
                     `}
@@ -423,11 +432,9 @@ TODO:
         // Initialization
         function initializeForm() {
             const form = document.getElementById('zakat-form');
-            const nisabSelector = form.querySelector('div:first-child').cloneNode(true);
-            const calculateButton = form.querySelector('button').cloneNode(true);
+            const calculateButton = form.querySelector('button');
             
             form.innerHTML = '';
-            form.appendChild(nisabSelector);
             
             Object.entries(formConfig.sections).forEach(([_, sectionConfig]) => {
                 const { section, content } = UI.createSection(sectionConfig.id, sectionConfig);
@@ -439,7 +446,7 @@ TODO:
                         preciousMetalsDiv.innerHTML = `
                             <div class="flex items-center justify-between">
                                 ${UI.createLabelWithTooltip(fieldConfig.label, fieldConfig.tooltip)}
-                                <button type="button" class="text-blue-500 hover:text-blue-700 text-sm">+ Add Another</button>
+                                <button type="button" class="text-green-500 hover:text-green-700 w-6 h-6 flex items-center justify-center text-xl font-bold leading-none">+</button>
                             </div>
                             <div class="precious-metals-container space-y-2 mt-2"></div>
                         `;
@@ -447,20 +454,21 @@ TODO:
                         const container = preciousMetalsDiv.querySelector('.precious-metals-container');
                         addButton.onclick = () => container.appendChild(UI.createPreciousMetalsFields());
                         content.appendChild(preciousMetalsDiv);
-                        setTimeout(() => container.appendChild(UI.createPreciousMetalsFields()), 0);
+                        container.appendChild(UI.createPreciousMetalsFields());
                     } else {
                         const fieldDiv = document.createElement('div');
                         fieldDiv.id = fieldConfig.groupId;
                         fieldDiv.innerHTML = `
                             <div class="flex items-center justify-between">
                                 ${UI.createLabelWithTooltip(fieldConfig.label, fieldConfig.tooltip)}
-                                <button type="button" class="text-blue-500 hover:text-blue-700 text-sm">+ Add Another</button>
+                                <button type="button" class="text-green-500 hover:text-green-700 w-6 h-6 flex items-center justify-center text-xl font-bold leading-none">+</button>
                             </div>
                             <div class="inputs-container space-y-2"></div>
                         `;
-                        fieldDiv.querySelector('button').onclick = () => fieldDiv.querySelector('.inputs-container').appendChild(UI.createInputField(fieldConfig.groupId));
+                        const container = fieldDiv.querySelector('.inputs-container');
+                        fieldDiv.querySelector('button').onclick = () => container.appendChild(UI.createInputField(fieldConfig.groupId));
                         content.appendChild(fieldDiv);
-                        fieldDiv.querySelector('.inputs-container').appendChild(UI.createInputField(fieldConfig.groupId));
+                        container.appendChild(UI.createInputField(fieldConfig.groupId));
                     }
                 });
                 
@@ -470,11 +478,35 @@ TODO:
             form.appendChild(calculateButton);
         }
 
+        function setNisabType(type) {
+            const goldCheck = document.getElementById('gold-check');
+            const silverCheck = document.getElementById('silver-check');
+            const goldCard = document.querySelector('[data-type="gold"]');
+            const silverCard = document.querySelector('[data-type="silver"]');
+            
+            // Update check marks
+            goldCheck.classList.toggle('hidden', type !== 'gold');
+            silverCheck.classList.toggle('hidden', type !== 'silver');
+            
+            // Update card borders
+            goldCard.querySelector('.border-2').classList.toggle('border-yellow-500', type === 'gold');
+            silverCard.querySelector('.border-2').classList.toggle('border-gray-400', type === 'silver');
+            
+            // Store the selected type
+            window.selectedNisabType = type;
+            
+            // Recalculate if there's a result showing
+            if (document.getElementById('result').innerHTML) {
+                calculateZakat();
+            }
+        }
+
         // Start the application
         window.onload = function() {
             initializeForm();
             updateMetalPrices();
             setInterval(updateMetalPrices, 300000); // Update every 5 minutes
+            setNisabType('gold'); // Set initial selection
         };
     </script>
 </body>
