@@ -13,6 +13,9 @@ TODO:
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zakat Calculator</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cleave.js/1.6.0/cleave.min.js"></script>
     <style>
         /* Remove up/down arrows from number inputs */
         input[type="number"]::-webkit-inner-spin-button,
@@ -37,16 +40,16 @@ TODO:
 </head>
 <body class="bg-gray-100 p-4">
     <div class="container mx-auto flex flex-col lg:flex-row gap-4 items-start justify-center">
-        <div class="bg-white shadow-lg rounded-2xl p-6 w-full max-w-md">
-            <h1 class="text-2xl font-bold text-center mb-4">Zakat Calculator</h1>
+    <div class="bg-white shadow-lg rounded-2xl p-6 w-full max-w-md">
+        <h1 class="text-2xl font-bold text-center mb-4">Zakat Calculator</h1>
 
             <form id="zakat-form" class="space-y-6">
-                <button type="button" onclick="calculateZakat()" class="w-full bg-blue-500 text-white p-2 rounded font-semibold hover:bg-blue-600">Calculate</button>
+                <button type="button" id="calculate-button" class="w-full bg-blue-500 text-white p-2 rounded font-semibold hover:bg-blue-600">Calculate</button>
             </form>
 
             <div id="result" class="mt-4 text-center text-lg font-semibold"></div>
             <button id="pay-link" style="display: none;" class="w-full mt-4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white p-3 rounded-lg font-semibold hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-md hover:shadow-lg">Pay Zakat Now</button>
-        </div>
+            </div>
 
         <div class="bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg rounded-2xl p-6 w-full max-w-md">
             <h3 class="text-xl font-bold mb-4 text-gray-800 text-center">Nisab Type</h3>
@@ -214,30 +217,373 @@ TODO:
         };
 
         // State management
-        let state = {
+        const state = {
             goldPrice: 0,
-            silverPrice: 0
+            silverPrice: 0,
+            nisabType: 'gold',
+            lastUpdate: null,
+            isCalculating: false,
+            
+            // Getters
+            get nisabThreshold() {
+                return this.nisabType === 'gold' 
+                    ? CONSTANTS.GOLD_NISAB_GRAMS * this.goldPrice 
+                    : CONSTANTS.SILVER_NISAB_GRAMS * this.silverPrice;
+            },
+            
+            // Setters
+            setNisabType(type) {
+                if (!['gold', 'silver'].includes(type)) {
+                    console.error('Invalid nisab type:', type);
+                    return;
+                }
+                this.nisabType = type;
+                this.updateUI();
+            },
+            
+            // UI Updates
+            updateUI() {
+                const goldCheck = document.getElementById('gold-check');
+                const silverCheck = document.getElementById('silver-check');
+                const goldCard = document.querySelector('[data-type="gold"]');
+                const silverCard = document.querySelector('[data-type="silver"]');
+                
+                if (goldCheck && silverCheck && goldCard && silverCard) {
+                    goldCheck.classList.toggle('hidden', this.nisabType !== 'gold');
+                    silverCheck.classList.toggle('hidden', this.nisabType !== 'silver');
+                    
+                    goldCard.querySelector('.border-2').classList.toggle('border-yellow-500', this.nisabType === 'gold');
+                    silverCard.querySelector('.border-2').classList.toggle('border-gray-400', this.nisabType === 'silver');
+                }
+            },
+            
+            // Price Updates
+            async updatePrices() {
+                try {
+                    // Simulated prices for demo
+                    this.goldPrice = 2881.20 / CONSTANTS.TROY_OUNCE_TO_GRAM;
+                    this.silverPrice = 33.50 / CONSTANTS.TROY_OUNCE_TO_GRAM;
+                    this.lastUpdate = new Date();
+                    
+                    // Update UI elements
+                    const elements = {
+                        'live-gold-price': this.goldPrice.toFixed(2),
+                        'live-silver-price': this.silverPrice.toFixed(2),
+                        'gold-nisab-value': (CONSTANTS.GOLD_NISAB_GRAMS * this.goldPrice).toFixed(2),
+                        'silver-nisab-value': (CONSTANTS.SILVER_NISAB_GRAMS * this.silverPrice).toFixed(2),
+                        'last-update-time': this.lastUpdate.toLocaleTimeString()
+                    };
+                    
+                    Object.entries(elements).forEach(([id, value]) => {
+                        const element = document.getElementById(id);
+                        if (element) element.textContent = value;
+                    });
+                    
+                    return true;
+                } catch (error) {
+                    console.error('Error updating metal prices:', error);
+                    return false;
+                }
+            }
+        };
+
+        // Cookie management
+        const CookieManager = {
+            setCookie(name, value, days = 365) {
+                try {
+                    const date = new Date();
+                    date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+                    const expires = `expires=${date.toUTCString()}`;
+                    const cookieValue = encodeURIComponent(JSON.stringify(value));
+                    document.cookie = `${name}=${cookieValue};${expires};path=/;SameSite=Strict`;
+                } catch (error) {
+                    console.error('Error saving cookie:', error);
+                }
+            },
+
+            getCookie(name) {
+                try {
+                    const cookieName = `${name}=`;
+                    const cookies = document.cookie.split(';');
+                    for (let cookie of cookies) {
+                        cookie = cookie.trim();
+                        if (cookie.indexOf(cookieName) === 0) {
+                            const value = cookie.substring(cookieName.length, cookie.length);
+                            return JSON.parse(decodeURIComponent(value));
+                        }
+                    }
+                    return null;
+                } catch (error) {
+                    console.error('Error reading cookie:', error);
+                    return null;
+                }
+            },
+
+            deleteCookie(name) {
+                try {
+                    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;SameSite=Strict`;
+                } catch (error) {
+                    console.error('Error deleting cookie:', error);
+                }
+            },
+
+            saveFormState() {
+                try {
+                    // Don't save if we're not fully initialized
+                    if (!window.isFormInitialized) {
+                        console.log('Form not fully initialized, skipping save');
+                        return;
+                    }
+
+                    const formState = {
+                        sections: {},
+                        nisabType: state.nisabType,
+                        lastSaved: new Date().toISOString()
+                    };
+
+                    // Save section visibility and field values
+                    Object.entries(formConfig.sections).forEach(([sectionKey, sectionConfig]) => {
+                        const section = document.getElementById(sectionConfig.id);
+                        if (!section) {
+                            console.warn(`Section ${sectionKey} not found in DOM`);
+                            return;
+                        }
+
+                        const toggle = section.querySelector('input[type="checkbox"]');
+                        if (!toggle) {
+                            console.warn(`Toggle not found for section ${sectionKey}`);
+                            return;
+                        }
+
+                        formState.sections[sectionKey] = {
+                            visible: toggle.checked,
+                            fields: {}
+                        };
+
+                        // Save field values
+                        Object.entries(sectionConfig.fields).forEach(([fieldKey, fieldConfig]) => {
+                            try {
+                                if (fieldConfig.type === 'precious-metals') {
+                                    const container = section.querySelector(`#${fieldConfig.groupId} .precious-metals-container`);
+                                    if (!container) {
+                                        console.warn(`Container not found for ${fieldKey}`);
+                                        return;
+                                    }
+
+                                    formState.sections[sectionKey].fields[fieldKey] = Array.from(container.children)
+                                        .map(row => {
+                                            const goldInput = row.querySelector('input[data-group="gold-weight"]');
+                                            const silverInput = row.querySelector('input[data-group="silver-weight"]');
+                                            return {
+                                                gold: goldInput ? (goldInput.dataset.rawValue || goldInput.value.replace(/,/g, '')) : '',
+                                                silver: silverInput ? (silverInput.dataset.rawValue || silverInput.value.replace(/,/g, '')) : ''
+                                            };
+                                        })
+                                        .filter(({ gold, silver }) => gold || silver); // Only save non-empty rows
+                                } else {
+                                    const inputs = document.querySelectorAll(`[data-group="${fieldConfig.groupId}"]`);
+                                    formState.sections[sectionKey].fields[fieldKey] = Array.from(inputs)
+                                        .map(input => input.dataset.rawValue || input.value.replace(/,/g, ''))
+                                        .filter(value => value); // Only save non-empty values
+                                }
+                            } catch (error) {
+                                console.error(`Error saving field ${fieldKey}:`, error);
+                            }
+                        });
+                    });
+
+                    this.setCookie('zakatFormState', formState);
+                    console.log('Form state saved successfully');
+                } catch (error) {
+                    console.error('Error saving form state:', error);
+                }
+            },
+
+            restoreFormState() {
+                try {
+                    const formState = this.getCookie('zakatFormState');
+                    if (!formState) {
+                        console.log('No saved form state found, keeping initial fields');
+                        return;
+                    }
+
+                    console.log('Restoring form state:', formState);
+
+                    // Validate form state structure
+                    if (!formState.sections || typeof formState.sections !== 'object') {
+                        throw new Error('Invalid form state structure');
+                    }
+
+                    // Restore nisab type
+                    if (formState.nisabType) {
+                        state.setNisabType(formState.nisabType);
+                    }
+
+                    // Restore section visibility and field values
+                    Object.entries(formState.sections).forEach(([sectionKey, sectionData]) => {
+                        const section = document.getElementById(formConfig.sections[sectionKey]?.id);
+                        if (!section) {
+                            console.warn(`Section ${sectionKey} not found in DOM`);
+                            return;
+                        }
+
+                        // Set section visibility
+                        const toggle = section.querySelector('input[type="checkbox"]');
+                        if (toggle) {
+                            toggle.checked = sectionData.visible;
+                            const content = section.querySelector(`#${formConfig.sections[sectionKey].id}-section`);
+                            if (content) {
+                                content.classList.toggle('hidden', !sectionData.visible);
+                            }
+                        }
+
+                        // Restore field values
+                        Object.entries(sectionData.fields || {}).forEach(([fieldKey, values]) => {
+                            const fieldConfig = formConfig.sections[sectionKey].fields[fieldKey];
+                            if (!fieldConfig) {
+                                console.warn(`Field ${fieldKey} not found in config`);
+                                return;
+                            }
+
+                            const container = section.querySelector(
+                                fieldConfig.type === 'precious-metals' 
+                                    ? `#${fieldConfig.groupId} .precious-metals-container`
+                                    : `#${fieldConfig.groupId} .inputs-container`
+                            );
+
+                            if (!container) {
+                                console.warn(`Container not found for ${fieldKey}`);
+                                return;
+                            }
+
+                            // Only clear and restore if we have values to restore
+                            if (values && values.length > 0) {
+                                container.innerHTML = '';
+                                values.forEach(value => {
+                                    const field = fieldConfig.type === 'precious-metals'
+                                        ? UI.createPreciousMetalsFields()
+                                        : UI.createInputField(fieldConfig.groupId);
+
+                                    if (field) {
+                                        if (fieldConfig.type === 'precious-metals') {
+                                            const goldInput = field.querySelector('input[data-group="gold-weight"]');
+                                            const silverInput = field.querySelector('input[data-group="silver-weight"]');
+                                            if (goldInput && value.gold) {
+                                                goldInput.value = value.gold;
+                                                goldInput.dataset.rawValue = value.gold;
+                                                UI.setupNumberInput(goldInput);
+                                            }
+                                            if (silverInput && value.silver) {
+                                                silverInput.value = value.silver;
+                                                silverInput.dataset.rawValue = value.silver;
+                                                UI.setupNumberInput(silverInput);
+                                            }
+                                        } else {
+                                            const input = field.querySelector('input');
+                                            if (input && value) {
+                                                input.value = value;
+                                                input.dataset.rawValue = value;
+                                                UI.setupNumberInput(input);
+                                            }
+                                        }
+                                        container.appendChild(field);
+                                    }
+                                });
+                            }
+                        });
+                    });
+                } catch (error) {
+                    console.error('Error restoring form state:', error);
+                    this.deleteCookie('zakatFormState');
+                }
+            }
         };
 
         // UI Components
         const UI = {
+            formatNumber(value) {
+                if (!value) return '';
+                const num = Number(value.replace(/[^\d.]/g, ''));
+                return isNaN(num) ? '' : num.toLocaleString('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+            },
+
+            setupNumberInput(input) {
+                if (!input) return;
+                try {
+                    new Cleave(input, {
+                        numeral: true,
+                        numeralDecimalScale: 2,
+                        numeralPositiveOnly: true,
+                        prefix: '',
+                        delimiter: ',',
+                        numeralDecimalMark: '.',
+                        onValueChanged: event => {
+                            input.dataset.rawValue = event.target.value.replace(/,/g, '');
+                        }
+                    });
+                } catch (error) {
+                    console.error('Error setting up number input:', error);
+                }
+            },
+
+            createButton(type, onClick, className, content) {
+                const button = document.createElement('button');
+                button.type = type;
+                button.className = className;
+                button.onclick = onClick;
+                button.innerHTML = content;
+                return button;
+            },
+
             createInputField(groupId, placeholder = "Enter amount") {
+                if (!groupId) return null;
                 const wrapper = document.createElement('div');
                 wrapper.className = 'flex items-center gap-2 mt-2';
                 
                 const input = document.createElement('input');
-                input.type = 'number';
-                input.className = 'w-full p-2 border rounded';
+                input.type = 'text';
+                input.className = 'w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900';
                 input.placeholder = placeholder;
                 input.dataset.group = groupId;
                 
-                const removeBtn = document.createElement('button');
-                removeBtn.type = 'button';
-                removeBtn.className = 'text-red-500 hover:text-red-700 w-6 h-6 flex items-center justify-center text-xl font-bold leading-none';
-                removeBtn.innerHTML = '−';
-                removeBtn.onclick = () => wrapper.remove();
+                UI.setupNumberInput(input);
+                
+                const removeBtn = UI.createButton(
+                    'button',
+                    () => wrapper.remove(),
+                    'text-red-500 hover:text-red-700 w-6 h-6 flex items-center justify-center text-xl font-bold leading-none focus:outline-none focus:ring-2 focus:ring-red-500 rounded',
+                    '−'
+                );
                 
                 wrapper.append(input, removeBtn);
+                return wrapper;
+            },
+
+            createPreciousMetalsFields() {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'flex items-center gap-2';
+                
+                ['gold', 'silver'].forEach(type => {
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.className = 'w-1/2 p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white';
+                    input.placeholder = `${type.charAt(0).toUpperCase() + type.slice(1)} (grams)`;
+                    input.dataset.group = `${type}-weight`;
+                    UI.setupNumberInput(input);
+                    wrapper.appendChild(input);
+                });
+                
+                const removeBtn = UI.createButton(
+                    'button',
+                    () => wrapper.remove(),
+                    'text-red-500 hover:text-red-700 w-6 h-6 flex items-center justify-center text-xl font-bold leading-none focus:outline-none focus:ring-2 focus:ring-red-500 rounded',
+                    '−'
+                );
+                
+                wrapper.appendChild(removeBtn);
                 return wrapper;
             },
 
@@ -255,42 +601,18 @@ TODO:
                 `;
             },
 
-            createPreciousMetalsFields() {
-                const wrapper = document.createElement('div');
-                wrapper.className = 'flex items-center gap-2';
-                
-                const goldInput = document.createElement('input');
-                goldInput.type = 'number';
-                goldInput.className = 'w-1/2 p-2 border rounded';
-                goldInput.placeholder = 'Gold (grams)';
-                goldInput.dataset.group = 'gold-weight';
-                
-                const silverInput = document.createElement('input');
-                silverInput.type = 'number';
-                silverInput.className = 'w-1/2 p-2 border rounded';
-                silverInput.placeholder = 'Silver (grams)';
-                silverInput.dataset.group = 'silver-weight';
-                
-                const removeBtn = document.createElement('button');
-                removeBtn.type = 'button';
-                removeBtn.className = 'text-red-500 hover:text-red-700 w-6 h-6 flex items-center justify-center text-xl font-bold leading-none';
-                removeBtn.innerHTML = '−';
-                removeBtn.onclick = () => wrapper.remove();
-                
-                wrapper.append(goldInput, silverInput, removeBtn);
-                return wrapper;
-            },
-
             createSection(sectionId, sectionConfig) {
                 const section = document.createElement('div');
-                section.className = 'border rounded-lg p-4';
+                section.id = sectionId;
+                section.className = `border rounded-lg p-4 mb-4 ${
+                    sectionId.includes('assets') ? 'bg-emerald-50/50' : 
+                    sectionId.includes('liabilities') ? 'bg-rose-50/50' : ''
+                }`;
                 
                 const header = document.createElement('div');
                 header.className = 'flex items-center justify-between mb-4';
                 
                 const title = document.createElement('h2');
-                const isAssetSection = sectionId.includes('assets');
-                const isLiabilitySection = sectionId.includes('liabilities');
                 title.className = 'text-lg font-semibold';
                 title.textContent = sectionConfig.title;
                 
@@ -307,19 +629,19 @@ TODO:
                 
                 const content = document.createElement('div');
                 content.id = `${sectionId}-section`;
-                content.className = 'space-y-4' + (!sectionConfig.defaultChecked ? ' hidden' : '');
+                content.className = 'space-y-4';
                 
-                if (isAssetSection) {
-                    section.className += ' bg-emerald-50/50';
-                } else if (isLiabilitySection) {
-                    section.className += ' bg-rose-50/50';
+                if (!sectionConfig.defaultChecked) {
+                    content.classList.add('hidden');
                 }
+                
+                toggle.addEventListener('change', () => {
+                    content.classList.toggle('hidden', !toggle.checked);
+                });
                 
                 toggleWrapper.append(toggle, toggleUI);
                 header.append(title, toggleWrapper);
                 section.append(header, content);
-                
-                toggle.addEventListener('change', () => content.classList.toggle('hidden', !toggle.checked));
                 
                 return { section, content };
             }
@@ -328,16 +650,33 @@ TODO:
         // Calculation helpers
         const Calculator = {
             getGroupTotal(groupId) {
+                if (!groupId) return 0;
                 return Array.from(document.querySelectorAll(`[data-group="${groupId}"]`))
-                    .reduce((sum, input) => sum + (Number(input.value) || 0), 0);
+                    .reduce((sum, input) => {
+                        const value = input.dataset.rawValue || '0';
+                        return sum + (Number(value) || 0);
+                    }, 0);
+            },
+
+            calculateSectionTotals(sectionConfig) {
+                return Object.entries(sectionConfig.fields)
+                    .map(([_, fieldConfig]) => {
+                        let value = 0;
+                        if (fieldConfig.type === 'precious-metals') {
+                            const goldValue = this.getGroupTotal('gold-weight') * state.goldPrice;
+                            const silverValue = this.getGroupTotal('silver-weight') * state.silverPrice;
+                            value = goldValue + silverValue;
+                        } else {
+                            value = this.getGroupTotal(fieldConfig.groupId);
+                        }
+                        return { label: fieldConfig.label, value };
+                    })
+                    .filter(({ value }) => value > 0);
             },
 
             calculateTotalAssets() {
-                const goldWeights = this.getGroupTotal('gold-weight');
-                const silverWeights = this.getGroupTotal('silver-weight');
-                const goldValue = goldWeights * state.goldPrice;
-                const silverValue = silverWeights * state.silverPrice;
-
+                const goldValue = this.getGroupTotal('gold-weight') * state.goldPrice;
+                const silverValue = this.getGroupTotal('silver-weight') * state.silverPrice;
                 const otherAssets = Object.entries(formConfig.sections)
                     .filter(([key]) => key.includes('Assets'))
                     .reduce((total, [_, section]) => {
@@ -345,44 +684,28 @@ TODO:
                             .filter(field => field.type !== 'precious-metals')
                             .reduce((sectionTotal, field) => sectionTotal + this.getGroupTotal(field.groupId), 0);
                     }, 0);
-
                 return goldValue + silverValue + otherAssets;
             },
 
             calculateTotalLiabilities() {
-                const personalLiabilities = Object.values(formConfig.sections.personalLiabilities.fields)
-                    .reduce((total, field) => total + this.getGroupTotal(field.groupId), 0);
-                
-                const businessLiabilities = Object.values(formConfig.sections.businessLiabilities.fields)
-                    .reduce((total, field) => total + this.getGroupTotal(field.groupId), 0);
-                
-                return personalLiabilities + businessLiabilities;
+                return Object.entries(formConfig.sections)
+                    .filter(([key]) => key.includes('Liabilities'))
+                    .reduce((total, [_, section]) => {
+                        return total + Object.values(section.fields)
+                            .reduce((sectionTotal, field) => sectionTotal + this.getGroupTotal(field.groupId), 0);
+                    }, 0);
             }
         };
 
-        // Price management
-        async function updateMetalPrices() {
-            try {
-                // Simulated prices for demo
-                state.goldPrice = 2881.20 / CONSTANTS.TROY_OUNCE_TO_GRAM;
-                state.silverPrice = 33.50 / CONSTANTS.TROY_OUNCE_TO_GRAM;
-                
-                document.getElementById('live-gold-price').textContent = state.goldPrice.toFixed(2);
-                document.getElementById('live-silver-price').textContent = state.silverPrice.toFixed(2);
-                document.getElementById('gold-nisab-value').textContent = (CONSTANTS.GOLD_NISAB_GRAMS * state.goldPrice).toFixed(2);
-                document.getElementById('silver-nisab-value').textContent = (CONSTANTS.SILVER_NISAB_GRAMS * state.silverPrice).toFixed(2);
-                document.getElementById('last-update-time').textContent = new Date().toLocaleTimeString();
-            } catch (error) {
-                console.error('Error updating metal prices:', error);
-            }
-        }
-
         // Main calculation function
-        function calculateZakat() {
+        window.calculateZakat = function() {
             if (!state.goldPrice || !state.silverPrice) {
                 document.getElementById('result').innerHTML = '<div class="text-red-500">Unable to calculate. Please wait for metal prices to load.</div>';
                 return;
             }
+
+            // Save form state before calculating
+            CookieManager.saveFormState();
 
             const totalAssets = Calculator.calculateTotalAssets();
             const totalLiabilities = Calculator.calculateTotalLiabilities();
@@ -398,119 +721,410 @@ TODO:
 
             document.getElementById('result').innerHTML = `
                 <div class="result-appear space-y-4 bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-xl shadow-sm">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="bg-white p-4 rounded-lg shadow-sm">
-                            <h3 class="text-gray-600 text-sm mb-1">Total Assets</h3>
-                            <p class="text-xl font-semibold text-gray-800">$${totalAssets.toFixed(2)}</p>
-                        </div>
-                        <div class="bg-white p-4 rounded-lg shadow-sm">
-                            <h3 class="text-gray-600 text-sm mb-1">Total Liabilities</h3>
-                            <p class="text-xl font-semibold text-gray-800">$${totalLiabilities.toFixed(2)}</p>
-                        </div>
+                    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                        <table class="w-full">
+                            <tbody>
+                                ${Object.entries(formConfig.sections)
+                                    .map(([sectionKey, sectionConfig]) => {
+                                        const sectionTotals = Calculator.calculateSectionTotals(sectionConfig);
+                                        const sectionTotal = sectionTotals.reduce((sum, { value }) => sum + value, 0);
+                                        return sectionTotal > 0 ? `
+                                            <tr>
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    <div class="text-sm font-medium text-gray-900 text-left">${sectionConfig.title}</div>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-right">
+                                                    <div class="text-sm font-medium text-gray-900">$${sectionTotal.toFixed(2)}</div>
+                                                </td>
+                                            </tr>
+                                        ` : '';
+                                    })
+                                    .join('')}
+                                
+                                ${(() => {
+                                    const hasBusinessSections = Object.values(formConfig.sections).some(section => 
+                                        section.id.includes('business') && 
+                                        document.getElementById(section.id)?.querySelector('input[type="checkbox"]')?.checked
+                                    );
+                                    
+                                    if (!hasBusinessSections) return '';
+                                    
+                                    return `
+                                        <tr class="border-t border-gray-200">
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="text-sm font-medium text-gray-900 text-left">Total Assets</div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-right">
+                                                <div class="text-sm font-medium text-gray-900">$${totalAssets.toFixed(2)}</div>
+                                            </td>
+                                        </tr>
+                                        
+                                        <tr>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="text-sm font-medium text-gray-900 text-left">Total Liabilities</div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-right">
+                                                <div class="text-sm font-medium text-gray-900">$${totalLiabilities.toFixed(2)}</div>
+                                            </td>
+                                        </tr>
+                                    `;
+                                })()}
+                                
+                                <tr class="border-t border-gray-200">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-gray-900 text-left">Net Wealth</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right">
+                                        <div class="text-sm font-medium text-gray-900">$${netWealth.toFixed(2)}</div>
+                                    </td>
+                                </tr>
+                                
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-gray-900 text-left">Zakat Amount Due</div>
+                                        ${!isEligible ? '<div class="text-sm text-gray-500 text-left">(Below Nisab threshold)</div>' : ''}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right">
+                                        <div class="text-sm font-medium text-gray-900">$${zakatAmount.toFixed(2)}</div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
-                    <div class="bg-white p-4 rounded-lg shadow-sm">
-                        <h3 class="text-gray-600 text-sm mb-1">Net Wealth</h3>
-                        <p class="text-xl font-semibold text-gray-800">$${netWealth.toFixed(2)}</p>
+                    
+                    <div class="flex flex-wrap justify-center gap-3 mt-4">
+                        ${isEligible ? `
+                            <button id="pay-link" class="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-md hover:shadow-lg flex items-center gap-2">
+                                Pay Zakat Now
+                            </button>
+                        ` : ''}
+                        <button onclick="downloadAsExcel()" class="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                            </svg>
+                            Excel
+                        </button>
+                        <button onclick="downloadAsPDF()" class="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition-colors flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                            </svg>
+                            PDF
+                        </button>
                     </div>
-                    ${isEligible ? `
-                        <div class="bg-blue-500 p-4 rounded-lg shadow-sm text-white">
-                            <h3 class="text-sm mb-1 opacity-90">Zakat Amount Due</h3>
-                            <p class="text-2xl font-bold">$${zakatAmount.toFixed(2)}</p>
-                        </div>
-                    ` : `
-                        <div class="bg-gray-100 p-4 rounded-lg shadow-sm">
-                            <p class="text-lg font-semibold text-gray-700">You do not need to pay Zakat</p>
-                            <p class="text-sm text-gray-600 mt-1">Your wealth is below the Nisab threshold</p>
-                        </div>
-                    `}
                 </div>
             `;
-            
-            document.getElementById('pay-link').style.display = isEligible ? 'block' : 'none';
+        }
+
+        // Download functions
+        function downloadAsExcel() {
+            const workbook = XLSX.utils.book_new();
+            const sectionsData = [];
+            let currentRow = 0;
+
+            // Add title and date
+            sectionsData.push(
+                ['Zakat Calculation Report'],
+                [`Generated on: ${new Date().toLocaleString()}`],
+                []
+            );
+            currentRow += 3;
+
+            // Add sections with pre-calculated values
+            Object.entries(formConfig.sections).forEach(([sectionKey, sectionConfig]) => {
+                const sectionTotals = Calculator.calculateSectionTotals(sectionConfig);
+                if (sectionTotals.length === 0) return;
+
+                sectionsData.push([sectionConfig.title]);
+                currentRow++;
+
+                sectionTotals.forEach(({ label, value }) => {
+                    sectionsData.push(['', label, value]);
+                    currentRow++;
+                });
+
+                const sectionTotal = sectionTotals.reduce((sum, { value }) => sum + value, 0);
+                sectionsData.push(['', 'Total', sectionTotal]);
+                currentRow++;
+                sectionsData.push([]);
+                currentRow++;
+            });
+
+            // Add summary section with pre-calculated values
+            const totalAssets = Calculator.calculateTotalAssets();
+            const totalLiabilities = Calculator.calculateTotalLiabilities();
+            const netWealth = totalAssets - totalLiabilities;
+
+            sectionsData.push(
+                ['Summary'],
+                ['', 'Total Assets', totalAssets],
+                ['', 'Total Liabilities', totalLiabilities],
+                ['', 'Net Wealth', netWealth]
+            );
+            currentRow += 4;
+
+            // Add Zakat section with pre-calculated values
+            const nisabType = window.selectedNisabType;
+            const nisabThreshold = nisabType === 'gold' 
+                ? CONSTANTS.GOLD_NISAB_GRAMS * state.goldPrice 
+                : CONSTANTS.SILVER_NISAB_GRAMS * state.silverPrice;
+
+            const isEligible = netWealth >= nisabThreshold;
+            const zakatAmount = isEligible ? netWealth * CONSTANTS.ZAKAT_RATE : 0;
+
+            sectionsData.push(
+                ['Zakat Status'],
+                ['', 'Zakat Amount Due', zakatAmount]
+            );
+
+            // Create and format worksheet
+            const sectionsSheet = XLSX.utils.aoa_to_sheet(sectionsData);
+            sectionsSheet['!cols'] = [{ wch: 20 }, { wch: 40 }, { wch: 15 }];
+
+            // Set cell types and formats
+            for (let R = 0; R < sectionsData.length; R++) {
+                for (let C = 0; C < sectionsData[R].length; C++) {
+                    const cell_address = { c: C, r: R };
+                    const cell_ref = XLSX.utils.encode_cell(cell_address);
+                    
+                    if (C === 2 && R > 2) {
+                        const value = sectionsData[R][C];
+                        sectionsSheet[cell_ref] = {
+                            t: 'n',
+                            v: value,
+                            z: '#,##0.00'
+                        };
+                    }
+                }
+            }
+
+            XLSX.utils.book_append_sheet(workbook, sectionsSheet, 'Zakat Calculation');
+            XLSX.writeFile(workbook, 'zakat_calculation.xlsx');
+        }
+
+        function downloadAsPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            let y = 20;
+
+            // Add title and date
+            doc.setFontSize(20);
+            doc.text('Zakat Calculation Report', 20, y);
+            y += 20;
+
+            doc.setFontSize(12);
+            doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, y);
+            y += 15;
+
+            // Add sections
+            Object.entries(formConfig.sections).forEach(([sectionKey, sectionConfig]) => {
+                const sectionTotals = Calculator.calculateSectionTotals(sectionConfig);
+                const sectionTotal = sectionTotals.reduce((sum, { value }) => sum + value, 0);
+                if (sectionTotal === 0) return;
+
+                doc.setFontSize(14);
+                doc.text(sectionConfig.title, 20, y);
+                y += 10;
+
+                doc.setFontSize(12);
+                sectionTotals.forEach(({ label, value }) => {
+                    doc.text(label, 30, y);
+                    doc.text(`$${value.toFixed(2)}`, 150, y);
+                    y += 8;
+                });
+
+                doc.text('Total', 30, y);
+                doc.text(`$${sectionTotal.toFixed(2)}`, 150, y);
+                y += 15;
+            });
+
+            // Add summary
+            const totalAssets = Calculator.calculateTotalAssets();
+            const totalLiabilities = Calculator.calculateTotalLiabilities();
+            const netWealth = totalAssets - totalLiabilities;
+
+            doc.setFontSize(14);
+            doc.text('Summary', 20, y);
+            y += 10;
+
+            doc.setFontSize(12);
+            if (totalAssets > 0) {
+                doc.text('Total Assets', 30, y);
+                doc.text(`$${totalAssets.toFixed(2)}`, 150, y);
+                y += 8;
+            }
+
+            if (totalLiabilities > 0) {
+                doc.text('Total Liabilities', 30, y);
+                doc.text(`$${totalLiabilities.toFixed(2)}`, 150, y);
+                y += 8;
+            }
+
+            doc.text('Net Wealth', 30, y);
+            doc.text(`$${netWealth.toFixed(2)}`, 150, y);
+            y += 15;
+
+            // Add Zakat amount
+            const nisabType = window.selectedNisabType;
+            const nisabThreshold = nisabType === 'gold' 
+                ? CONSTANTS.GOLD_NISAB_GRAMS * state.goldPrice 
+                : CONSTANTS.SILVER_NISAB_GRAMS * state.silverPrice;
+
+            const isEligible = netWealth >= nisabThreshold;
+            const zakatAmount = isEligible ? netWealth * CONSTANTS.ZAKAT_RATE : 0;
+
+            doc.setFontSize(14);
+            if (isEligible) {
+                doc.text('Zakat Amount Due', 20, y);
+                y += 10;
+                doc.setFontSize(16);
+                doc.text(`$${zakatAmount.toFixed(2)}`, 150, y);
+            } else {
+                doc.text('Zakat Status', 20, y);
+                y += 10;
+                doc.setFontSize(12);
+                doc.text('Not eligible - Wealth below Nisab threshold', 30, y);
+            }
+
+            doc.save('zakat_calculation.pdf');
         }
 
         // Initialization
-        function initializeForm() {
-            const form = document.getElementById('zakat-form');
-            const calculateButton = form.querySelector('button');
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize core functionality
+            setNisabType('gold');
+            state.updatePrices();
+            setInterval(state.updatePrices, 300000); // Update every 5 minutes
             
+            // Initialize form
+            const form = document.getElementById('zakat-form');
+            if (!form) return;
+            
+            // Clear existing content
             form.innerHTML = '';
             
+            // Create all sections
             Object.entries(formConfig.sections).forEach(([_, sectionConfig]) => {
                 const { section, content } = UI.createSection(sectionConfig.id, sectionConfig);
                 
+                // Create fields for each section
                 Object.entries(sectionConfig.fields).forEach(([_, fieldConfig]) => {
-                    if (fieldConfig.type === 'precious-metals') {
-                        const preciousMetalsDiv = document.createElement('div');
-                        preciousMetalsDiv.id = 'precious-metals-group';
-                        preciousMetalsDiv.innerHTML = `
-                            <div class="flex items-center justify-between">
-                                ${UI.createLabelWithTooltip(fieldConfig.label, fieldConfig.tooltip)}
-                                <button type="button" class="text-green-500 hover:text-green-700 w-6 h-6 flex items-center justify-center text-xl font-bold leading-none">+</button>
-                            </div>
-                            <div class="precious-metals-container space-y-2 mt-2"></div>
-                        `;
-                        const addButton = preciousMetalsDiv.querySelector('button');
-                        const container = preciousMetalsDiv.querySelector('.precious-metals-container');
-                        addButton.onclick = () => container.appendChild(UI.createPreciousMetalsFields());
-                        content.appendChild(preciousMetalsDiv);
-                        container.appendChild(UI.createPreciousMetalsFields());
-                    } else {
-                        const fieldDiv = document.createElement('div');
-                        fieldDiv.id = fieldConfig.groupId;
-                        fieldDiv.innerHTML = `
-                            <div class="flex items-center justify-between">
-                                ${UI.createLabelWithTooltip(fieldConfig.label, fieldConfig.tooltip)}
-                                <button type="button" class="text-green-500 hover:text-green-700 w-6 h-6 flex items-center justify-center text-xl font-bold leading-none">+</button>
-                            </div>
-                            <div class="inputs-container space-y-2"></div>
-                        `;
-                        const container = fieldDiv.querySelector('.inputs-container');
-                        fieldDiv.querySelector('button').onclick = () => container.appendChild(UI.createInputField(fieldConfig.groupId));
-                        content.appendChild(fieldDiv);
-                        container.appendChild(UI.createInputField(fieldConfig.groupId));
+                    const fieldDiv = document.createElement('div');
+                    fieldDiv.id = fieldConfig.groupId;
+                    fieldDiv.className = 'mb-4';
+                    
+                    const labelContainer = document.createElement('div');
+                    labelContainer.className = 'flex items-center justify-between mb-2';
+                    labelContainer.innerHTML = UI.createLabelWithTooltip(fieldConfig.label, fieldConfig.tooltip);
+                    
+                    const addButton = UI.createButton(
+                        'button',
+                        () => {
+                            const newField = fieldConfig.type === 'precious-metals' 
+                                ? UI.createPreciousMetalsFields() 
+                                : UI.createInputField(fieldConfig.groupId);
+                            container.appendChild(newField);
+                        },
+                        'text-green-500 hover:text-green-700 w-6 h-6 flex items-center justify-center text-xl font-bold leading-none',
+                        '+'
+                    );
+                    
+                    labelContainer.appendChild(addButton);
+                    
+                    const container = document.createElement('div');
+                    container.className = fieldConfig.type === 'precious-metals' 
+                        ? 'precious-metals-container space-y-2' 
+                        : 'inputs-container space-y-2';
+                    
+                    const initialField = fieldConfig.type === 'precious-metals'
+                        ? UI.createPreciousMetalsFields()
+                        : UI.createInputField(fieldConfig.groupId);
+                    
+                    if (initialField) {
+                        container.appendChild(initialField);
                     }
+                    
+                    fieldDiv.appendChild(labelContainer);
+                    fieldDiv.appendChild(container);
+                    content.appendChild(fieldDiv);
                 });
                 
                 form.appendChild(section);
             });
             
+            // Add calculate button
+            const calculateButton = UI.createButton(
+                'button',
+                window.calculateZakat,
+                'w-full bg-blue-500 text-white p-2 rounded font-semibold hover:bg-blue-600 mt-4',
+                'Calculate'
+            );
+            calculateButton.id = 'calculate-button';
             form.appendChild(calculateButton);
-        }
+            
+            // Set form as initialized
+            window.isFormInitialized = true;
+            
+            // Wait a brief moment before restoring state to ensure DOM is ready
+            setTimeout(() => {
+                CookieManager.restoreFormState();
+            }, 100);
+            
+            // Debounced form state saving
+            const debounce = (fn, delay) => {
+                let timeoutId;
+                return (...args) => {
+                    clearTimeout(timeoutId);
+                    timeoutId = setTimeout(() => fn(...args), delay);
+                };
+            };
+
+            const debouncedSave = debounce(() => {
+                if (window.isFormInitialized) {
+                    CookieManager.saveFormState();
+                }
+            }, 1000);
+
+            // Event listeners
+            document.addEventListener('input', e => {
+                if (e.target.matches('input[type="text"]')) {
+                    debouncedSave();
+                }
+            });
+
+            document.addEventListener('change', e => {
+                if (e.target.matches('input[type="checkbox"]')) {
+                    debouncedSave();
+                }
+            });
+        });
 
         function setNisabType(type) {
-            const goldCheck = document.getElementById('gold-check');
-            const silverCheck = document.getElementById('silver-check');
-            const goldCard = document.querySelector('[data-type="gold"]');
-            const silverCard = document.querySelector('[data-type="silver"]');
+            if (!['gold', 'silver'].includes(type)) return;
             
-            // Update check marks
-            goldCheck.classList.toggle('hidden', type !== 'gold');
-            silverCheck.classList.toggle('hidden', type !== 'silver');
+            const elements = {
+                gold: {
+                    check: document.getElementById('gold-check'),
+                    card: document.querySelector('[data-type="gold"]')
+                },
+                silver: {
+                    check: document.getElementById('silver-check'),
+                    card: document.querySelector('[data-type="silver"]')
+                }
+            };
             
-            // Update card borders
-            goldCard.querySelector('.border-2').classList.toggle('border-yellow-500', type === 'gold');
-            silverCard.querySelector('.border-2').classList.toggle('border-gray-400', type === 'silver');
+            Object.entries(elements).forEach(([metal, { check, card }]) => {
+                check.classList.toggle('hidden', metal !== type);
+                card.querySelector('.border-2').classList.toggle(
+                    metal === 'gold' ? 'border-yellow-500' : 'border-gray-400',
+                    metal === type
+                );
+            });
             
-            // Store the selected type
             window.selectedNisabType = type;
-            
-            // Recalculate if there's a result showing
             if (document.getElementById('result').innerHTML) {
-                calculateZakat();
+                window.calculateZakat();
             }
         }
-
-        // Start the application
-        window.onload = function() {
-            initializeForm();
-            updateMetalPrices();
-            setInterval(updateMetalPrices, 300000); // Update every 5 minutes
-            setNisabType('gold'); // Set initial selection
-        };
     </script>
 </body>
 </html>
-
-
-
