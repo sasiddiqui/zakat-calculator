@@ -48,7 +48,6 @@ TODO:
             </form>
 
             <div id="result" class="mt-4 text-center text-lg font-semibold"></div>
-            <button id="pay-link" style="display: none;" class="w-full mt-4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white p-3 rounded-lg font-semibold hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-md hover:shadow-lg">Pay Zakat Now</button>
             </div>
 
         <div class="bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg rounded-2xl p-6 w-full max-w-md">
@@ -719,63 +718,81 @@ TODO:
             const isEligible = netWealth >= nisabThreshold;
             const zakatAmount = isEligible ? netWealth * CONSTANTS.ZAKAT_RATE : 0;
 
-            document.getElementById('result').innerHTML = `
+            // Generate section rows
+            const sectionRows = Object.entries(formConfig.sections)
+                .map(([sectionKey, sectionConfig]) => {
+                    const sectionTotals = Calculator.calculateSectionTotals(sectionConfig);
+                    const sectionTotal = sectionTotals.reduce((sum, { value }) => sum + value, 0);
+                    return sectionTotal > 0 ? 
+                        `<tr>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900 text-left">${sectionConfig.title}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right">
+                                <div class="text-sm font-medium text-gray-900">$${sectionTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                            </td>
+                        </tr>` : '';
+                })
+                .join('');
+
+            // Generate business section rows if needed
+            const hasBusinessSections = Object.values(formConfig.sections).some(section => 
+                section.id.includes('business') && 
+                document.getElementById(section.id)?.querySelector('input[type="checkbox"]')?.checked
+            );
+
+            const businessRows = hasBusinessSections ? 
+                `<tr class="border-t border-gray-200">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900 text-left">Total Assets</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right">
+                        <div class="text-sm font-medium text-gray-900">$${totalAssets.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900 text-left">Total Liabilities</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right">
+                        <div class="text-sm font-medium text-gray-900">$${totalLiabilities.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                    </td>
+                </tr>` : '';
+
+            // Generate action buttons
+            const actionButtons = `
+                ${isEligible ? 
+                    `<button id="pay-link" onclick="window.location.href='https://darulqasim.org/donate-bb/'" class="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-md hover:shadow-lg flex items-center gap-2">
+                        Pay Zakat Now
+                    </button>` : ''}
+                <button onclick="downloadAsExcel()" class="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                    </svg>
+                    Excel
+                </button>
+                <button onclick="downloadAsPDF()" class="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition-colors flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                    </svg>
+                    PDF
+                </button>`;
+
+            // Generate final HTML
+            const resultHTML = `
                 <div class="result-appear space-y-4 bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-xl shadow-sm">
                     <div class="bg-white rounded-lg shadow-sm overflow-hidden">
                         <table class="w-full">
                             <tbody>
-                                ${Object.entries(formConfig.sections)
-                                    .map(([sectionKey, sectionConfig]) => {
-                                        const sectionTotals = Calculator.calculateSectionTotals(sectionConfig);
-                                        const sectionTotal = sectionTotals.reduce((sum, { value }) => sum + value, 0);
-                                        return sectionTotal > 0 ? `
-                                            <tr>
-                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                    <div class="text-sm font-medium text-gray-900 text-left">${sectionConfig.title}</div>
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-right">
-                                                    <div class="text-sm font-medium text-gray-900">$${sectionTotal.toFixed(2)}</div>
-                                                </td>
-                                            </tr>
-                                        ` : '';
-                                    })
-                                    .join('')}
-                                
-                                ${(() => {
-                                    const hasBusinessSections = Object.values(formConfig.sections).some(section => 
-                                        section.id.includes('business') && 
-                                        document.getElementById(section.id)?.querySelector('input[type="checkbox"]')?.checked
-                                    );
-                                    
-                                    if (!hasBusinessSections) return '';
-                                    
-                                    return `
-                                        <tr class="border-t border-gray-200">
-                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                <div class="text-sm font-medium text-gray-900 text-left">Total Assets</div>
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-right">
-                                                <div class="text-sm font-medium text-gray-900">$${totalAssets.toFixed(2)}</div>
-                                            </td>
-                                        </tr>
-                                        
-                                        <tr>
-                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                <div class="text-sm font-medium text-gray-900 text-left">Total Liabilities</div>
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-right">
-                                                <div class="text-sm font-medium text-gray-900">$${totalLiabilities.toFixed(2)}</div>
-                                            </td>
-                                        </tr>
-                                    `;
-                                })()}
-                                
+                                ${sectionRows}
+                                ${businessRows}
                                 <tr class="border-t border-gray-200">
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <div class="text-sm font-medium text-gray-900 text-left">Net Wealth</div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right">
-                                        <div class="text-sm font-medium text-gray-900">$${netWealth.toFixed(2)}</div>
+                                        <div class="text-sm font-medium text-gray-900">$${netWealth.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
                                     </td>
                                 </tr>
                                 
@@ -785,7 +802,7 @@ TODO:
                                         ${!isEligible ? '<div class="text-sm text-gray-500 text-left">(Below Nisab threshold)</div>' : ''}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right">
-                                        <div class="text-sm font-medium text-gray-900">$${zakatAmount.toFixed(2)}</div>
+                                        <div class="text-sm font-medium text-gray-900">$${zakatAmount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
                                     </td>
                                 </tr>
                             </tbody>
@@ -793,27 +810,12 @@ TODO:
                     </div>
                     
                     <div class="flex flex-wrap justify-center gap-3 mt-4">
-                        ${isEligible ? `
-                            <button id="pay-link" class="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-md hover:shadow-lg flex items-center gap-2">
-                                Pay Zakat Now
-                            </button>
-                        ` : ''}
-                        <button onclick="downloadAsExcel()" class="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                            </svg>
-                            Excel
-                        </button>
-                        <button onclick="downloadAsPDF()" class="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition-colors flex items-center gap-2">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
-                            </svg>
-                            PDF
-                        </button>
+                        ${actionButtons}
                     </div>
-                </div>
-            `;
-        }
+                </div>`;
+
+            document.getElementById('result').innerHTML = resultHTML;
+        };
 
         // Download functions
         function downloadAsExcel() {
@@ -928,12 +930,12 @@ TODO:
                 doc.setFontSize(12);
                 sectionTotals.forEach(({ label, value }) => {
                     doc.text(label, 30, y);
-                    doc.text(`$${value.toFixed(2)}`, 150, y);
+                    doc.text(`$${value.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, 150, y);
                     y += 8;
                 });
 
                 doc.text('Total', 30, y);
-                doc.text(`$${sectionTotal.toFixed(2)}`, 150, y);
+                doc.text(`$${sectionTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, 150, y);
                 y += 15;
             });
 
@@ -949,18 +951,18 @@ TODO:
             doc.setFontSize(12);
             if (totalAssets > 0) {
                 doc.text('Total Assets', 30, y);
-                doc.text(`$${totalAssets.toFixed(2)}`, 150, y);
+                doc.text(`$${totalAssets.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, 150, y);
                 y += 8;
             }
 
             if (totalLiabilities > 0) {
                 doc.text('Total Liabilities', 30, y);
-                doc.text(`$${totalLiabilities.toFixed(2)}`, 150, y);
+                doc.text(`$${totalLiabilities.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, 150, y);
                 y += 8;
             }
 
             doc.text('Net Wealth', 30, y);
-            doc.text(`$${netWealth.toFixed(2)}`, 150, y);
+            doc.text(`$${netWealth.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, 150, y);
             y += 15;
 
             // Add Zakat amount
@@ -977,7 +979,7 @@ TODO:
                 doc.text('Zakat Amount Due', 20, y);
                 y += 10;
                 doc.setFontSize(16);
-                doc.text(`$${zakatAmount.toFixed(2)}`, 150, y);
+                doc.text(`$${zakatAmount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, 150, y);
             } else {
                 doc.text('Zakat Status', 20, y);
                 y += 10;
