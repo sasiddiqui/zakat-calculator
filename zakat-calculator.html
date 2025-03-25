@@ -63,8 +63,8 @@ TODO:
 <body class="bg-gray-100 p-4">
     <div class="container mx-auto flex flex-col lg:flex-row gap-4 items-start justify-center">
         <div class="bg-white shadow-lg rounded-2xl p-6 w-full max-w-md relative">
-            <h1 class="text-2xl font-bold text-center mb-4">Zakat Calculator</h1>
-            
+        <h1 class="text-2xl font-bold text-center mb-4">Zakat Calculator</h1>
+
             <!-- Settings Icon -->
             <button id="settings-toggle" class="absolute top-6 right-6 text-gray-400 hover:text-gray-600 transition-colors">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -85,7 +85,7 @@ TODO:
             </form>
 
             <div id="result" class="mt-4 text-center text-lg font-semibold"></div>
-        </div>
+            </div>
 
         <!-- Settings Panel -->
         <div id="settings-overlay" class="settings-overlay fixed inset-0 bg-black bg-opacity-50 z-40"></div>
@@ -98,7 +98,7 @@ TODO:
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                         </svg>
                     </button>
-                </div>
+            </div>
 
                 <!-- Nisab Type Section -->
                 <div class="mb-8">
@@ -144,26 +144,26 @@ TODO:
                         <p class="text-sm text-gray-500">Current market prices update every 5 minutes</p>
                         <p class="text-xs text-gray-400 mt-1">Last updated: <span id="last-update-time"></span></p>
                     </div>
-                </div>
+            </div>
 
                 <!-- Label Settings Section -->
                 <div class="mb-8">
                     <h3 class="text-lg font-semibold text-gray-800 mb-4">Label Settings</h3>
                     <div class="bg-white rounded-xl p-4 shadow-sm">
                         <div class="flex items-center justify-between">
-                            <div>
+            <div>
                                 <h4 class="text-base font-medium text-gray-800">Enable Custom Labels</h4>
                                 <p class="text-sm text-gray-500">Add labels for each input field. For example, you can label your cash as "Checking Account", "Cash (physical)", etc.</p>
                             </div>
                             <label class="relative inline-flex items-center cursor-pointer">
                                 <input type="checkbox" id="enable-labels" class="sr-only peer">
                                 <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                            </label>
+                </label>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
+            </div>
 
         <!-- FAQ Panel -->
         <div id="faq-overlay" class="settings-overlay fixed inset-0 bg-black bg-opacity-50 z-40"></div>
@@ -180,7 +180,7 @@ TODO:
                 <div id="faq-container"></div>
             </div>
         </div>
-    </div>
+            </div>
 
     <!-- Autosave Indicator -->
     <div id="autosave-indicator" class="fixed bottom-4 right-4 flex items-center gap-1.5 text-sm bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border border-gray-200/50 transition-all duration-300 opacity-0 pointer-events-none">
@@ -188,7 +188,7 @@ TODO:
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
         </svg>
         <span class="text-xs font-medium">Saved</span>
-    </div>
+            </div>
 
     <script>
         // FAQ Data
@@ -446,11 +446,11 @@ TODO:
                             tooltip: 'Immediate debts due (rent, utilities, etc.)',
                             groupId: 'immediate-debts-group'
                         },
-                        zakatPaid: {
-                            label: 'Zakat Paid in Advance',
-                            tooltip: 'Any Zakat amount already paid in advance',
-                            groupId: 'zakat-paid-group'
-                        }
+                        // zakatPaid: {
+                        //     label: 'Zakat Paid in Advance',
+                        //     tooltip: 'Any Zakat amount already paid in advance',
+                        //     groupId: 'zakat-paid-group'
+                        // }
                     }
                 },
                 businessAssets: {
@@ -981,7 +981,7 @@ TODO:
                                     <div class="bg-white rounded-lg p-4 shadow-sm">
                                         <h5 class="font-medium text-gray-800 mb-2">${q.question}</h5>
                                         <p class="text-sm text-gray-600">${q.answer.replace(/\n/g, '<br>')}</p>
-                                    </div>
+    </div>
                                 `).join('')}
                             </div>
                         </div>
